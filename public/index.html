@@ -1,0 +1,289 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+  <title>AstroCadet // NASA Junior Spacewalk Trainer (LAN Co-Op)</title>
+  <link rel="stylesheet" href="css/style.css">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@500;700;900&family=Rajdhani:wght@500;600;700&display=swap" rel="stylesheet">
+  <script src="/socket.io/socket.io.js"></script>
+</head>
+<body class="theme-space">
+
+  <!-- ================= LOBBY SCREEN ================= -->
+  <div id="lobby-screen" class="overlay-modal active">
+    <div class="modal-card">
+      <div class="nasa-insignia">
+        <span class="badge">NASA SPACE APPS CHALLENGE</span>
+        <h1>ASTROCADET: ORBITAL DEFENSE</h1>
+        <p class="subtitle">Junior Astronaut Spacewalk & Mission Control LAN Simulator</p>
+      </div>
+
+      <div class="room-setup">
+        <div class="input-group">
+          <label for="cadet-callsign">CADET CALLSIGN</label>
+          <input type="text" id="cadet-callsign" placeholder="e.g. Neil, Sally, Chris" value="Cadet-1">
+        </div>
+        <div class="input-group">
+          <label for="room-code">MISSION CODE (LAN ROOM)</label>
+          <input type="text" id="room-code" placeholder="ARTEMIS" value="ARTEMIS">
+        </div>
+      </div>
+
+      <div class="role-selection">
+        <h3>CHOOSE YOUR CREW STATION</h3>
+        <div class="role-grid">
+          <div class="role-card" data-role="astronaut" id="select-astronaut">
+            <div class="role-icon">🧑‍🚀</div>
+            <h4>EVA ASTRONAUT</h4>
+            <span class="role-tagline">Outside the Station</span>
+            <p>Control the MMU jetpack with auto-stabilizer, receive live voice/text instructions from Houston, and repair damaged ISS modules.</p>
+            <button class="btn btn-primary btn-touch" onclick="joinGame('astronaut')">LAUNCH AS ASTRONAUT</button>
+          </div>
+
+          <div class="role-card" data-role="houston" id="select-houston">
+            <div class="role-icon">📡</div>
+            <h4>MISSION CONTROL (HOUSTON)</h4>
+            <span class="role-tagline">Flight Operations Desk</span>
+            <p>Read real-time diagnostics, decode NASA repair manuals, transmit radio directives to the astronaut, and vent emergency oxygen.</p>
+            <button class="btn btn-secondary btn-touch" onclick="joinGame('houston')">COMMENCE CAPCOM</button>
+          </div>
+        </div>
+
+        <div class="solo-option">
+          <button class="btn btn-ghost btn-touch" onclick="joinGame('solo')">
+            🕹️ Solo Training Mode (Play Astronaut with AI Houston)
+          </button>
+        </div>
+      </div>
+
+      <div class="lan-instruction-banner">
+        <strong>📱 MOBILE PLAY:</strong>
+        <p>Works on iPhone, iPad, & Android. Open your browser to the LAN Wi-Fi URL. Use onscreen touch controls to fly or navigate Houston's telemetry tabs.</p>
+      </div>
+    </div>
+  </div>
+
+  <!-- ================= TOP HUD TELEMETRY ================= -->
+  <header id="top-hud">
+    <div class="hud-left">
+      <div class="hud-block">
+        <span class="label">MISSION</span>
+        <span class="val" id="hud-room">ARTEMIS</span>
+      </div>
+      <div class="hud-block">
+        <span class="label">MET</span>
+        <span class="val" id="hud-timer">00:00</span>
+      </div>
+    </div>
+
+    <div class="hud-center">
+      <div class="meter-group">
+        <span class="meter-label">HULL</span>
+        <div class="progress-bar"><div id="bar-hull" class="fill fill-green" style="width: 100%;"></div></div>
+        <span id="text-hull" class="meter-num">100%</span>
+      </div>
+      <div class="meter-group">
+        <span class="meter-label">O₂</span>
+        <div class="progress-bar"><div id="bar-o2" class="fill fill-blue" style="width: 100%;"></div></div>
+        <span id="text-o2" class="meter-num">100%</span>
+      </div>
+      <div class="meter-group hide-mobile">
+        <span class="meter-label">POWER</span>
+        <div class="progress-bar"><div id="bar-power" class="fill fill-yellow" style="width: 100%;"></div></div>
+        <span id="text-power" class="meter-num">100%</span>
+      </div>
+    </div>
+
+    <div class="hud-right">
+      <div class="score-display">
+        <span class="val" id="hud-score">0 PTS</span>
+      </div>
+      <button id="btn-audio" class="btn-icon" onclick="toggleAudio()" aria-label="Toggle Audio">🔊</button>
+    </div>
+  </header>
+
+  <!-- ================= MAIN VIEW CONTAINER ================= -->
+  <main id="game-container">
+    
+    <!-- 1. ASTRONAUT CANVAS VIEWPORT -->
+    <div id="astronaut-viewport" class="viewport-screen">
+      <canvas id="spacewalk-canvas"></canvas>
+
+      <!-- Helmet Visor Radio Comms HUD for Astronaut -->
+      <div id="astronaut-radio-hud" class="visor-radio-panel">
+        <div class="visor-radio-header">
+          <span class="live-dot">●</span>
+          <span class="radio-label">HELMET COMM LINK // HOUSTON CAPCOM</span>
+        </div>
+        <div id="astronaut-radio-feed" class="visor-radio-feed">
+          <div class="visor-msg incoming">
+            <span class="sender">HOUSTON:</span> Stand by for telemetry. Directives will appear here.
+          </div>
+        </div>
+        <div class="visor-quick-actions">
+          <button class="quick-btn" onclick="sendQuickReply('Copy Houston, on my way.')">🎤 "Copy Houston"</button>
+          <button class="quick-btn" onclick="sendQuickReply('Need oxygen boost!')">💨 "Request O₂"</button>
+        </div>
+      </div>
+
+      <!-- Repair interaction modal overlay -->
+      <div id="repair-dock-modal" class="repair-modal hidden">
+        <div class="repair-header">
+          <span class="badge warning-badge">EMERGENCY REPAIR</span>
+          <h2 id="repair-module-title">SOLAR ARRAY ALPHA</h2>
+        </div>
+        <p class="repair-note">
+          ⚠️ Check <strong>Houston's radio directive</strong> above for the exact override code!
+        </p>
+        <div class="repair-actions" id="repair-action-buttons">
+          <!-- Dynamically populated buttons -->
+        </div>
+        <div class="repair-feedback" id="repair-feedback-msg">Awaiting input...</div>
+        <button class="btn btn-ghost btn-close-modal" onclick="closeRepairModal()">DISENGAGE REPAIR</button>
+      </div>
+
+      <!-- Mobile Onscreen Touch Controls -->
+      <div id="mobile-controls" class="touch-controls">
+        <div class="touch-dpad">
+          <button class="touch-btn d-up" data-dir="up">▲</button>
+          <div class="touch-row">
+            <button class="touch-btn d-left" data-dir="left">◀</button>
+            <div class="touch-center">RCS</div>
+            <button class="touch-btn d-right" data-dir="right">▶</button>
+          </div>
+          <button class="touch-btn d-down" data-dir="down">▼</button>
+        </div>
+
+        <div class="touch-action-panel">
+          <button id="btn-touch-repair" class="touch-btn-action" onclick="checkRepairInteraction()">
+            <span class="act-icon">🛠️</span>
+            <span class="act-label">REPAIR</span>
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- 2. MISSION CONTROL (HOUSTON) DASHBOARD VIEWPORT -->
+    <div id="houston-viewport" class="viewport-screen hidden">
+      
+      <!-- Mobile Tab Bar for Houston -->
+      <nav class="mobile-tab-nav" id="houston-tab-nav">
+        <button class="tab-btn active" data-tab="tab-diagnostics" onclick="switchHoustonTab('tab-diagnostics')">
+          🚨 DIRECTIVES
+        </button>
+        <button class="tab-btn" data-tab="tab-schematic" onclick="switchHoustonTab('tab-schematic')">
+          🛰️ STATION
+        </button>
+        <button class="tab-btn" data-tab="tab-comms" onclick="switchHoustonTab('tab-comms')">
+          📻 COMMS
+        </button>
+      </nav>
+
+      <div class="houston-dashboard">
+        
+        <!-- Tab 1 / Left: Station Blueprint & Radar -->
+        <div class="dash-panel blueprint-panel" id="tab-schematic">
+          <div class="panel-header">
+            <h3>🛰️ ISS SCHEMATIC & TELEMETRY</h3>
+            <span class="live-indicator">● LIVE SENSORS</span>
+          </div>
+          <div class="station-map-container" id="station-map">
+            <!-- ISS Schematic -->
+          </div>
+          <div class="spacewalker-locator">
+            <strong>SPACELINK TELEMETRY:</strong>
+            <span id="eva-status-text">Astronaut in Quest Airlock</span>
+          </div>
+        </div>
+
+        <!-- Tab 2 / Center: Diagnostic Emergency & Manual -->
+        <div class="dash-panel diagnostic-panel active-mobile-tab" id="tab-diagnostics">
+          <div class="panel-header">
+            <h3>🚨 EMERGENCY FLIGHT MANUAL</h3>
+            <span id="emergency-severity-tag" class="status-pill status-nominal">SYSTEMS NOMINAL</span>
+          </div>
+
+          <div id="emergency-alert-card" class="emergency-box empty">
+            <div class="no-emergency">
+              <div class="pulse-icon">✓</div>
+              <h4>ALL SYSTEMS OPERATIONAL</h4>
+              <p>Keep monitoring station pressure and stand by for automated telemetry alarms.</p>
+            </div>
+          </div>
+
+          <!-- Houston Command Controls -->
+          <div class="flight-director-controls">
+            <h4>FLIGHT CONTROLLER COMMANDS</h4>
+            <div class="command-grid">
+              <button class="cmd-btn btn-blue" onclick="sendHoustonAction('EMERGENCY_O2_BOOST')">
+                <span class="icon">💨</span>
+                <div class="cmd-details">
+                  <span class="cmd-title">EMERGENCY O₂ VENT</span>
+                  <span class="cmd-desc">+25% Spacewalker Oxygen</span>
+                </div>
+              </button>
+              <button class="cmd-btn btn-yellow" onclick="sendHoustonAction('POWER_REROUTE')">
+                <span class="icon">⚡</span>
+                <div class="cmd-details">
+                  <span class="cmd-title">REROUTE SOLAR BUS</span>
+                  <span class="cmd-desc">+20% Station Power</span>
+                </div>
+              </button>
+              <button class="cmd-btn btn-green" onclick="sendHoustonAction('RADAR_PING')">
+                <span class="icon">🎯</span>
+                <div class="cmd-details">
+                  <span class="cmd-title">BEACON VECTOR PING</span>
+                  <span class="cmd-desc">Highlight Target to EVA</span>
+                </div>
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <!-- Tab 3 / Right: Crew Radio & NASA Flight Notes -->
+        <div class="dash-panel comms-panel" id="tab-comms">
+          <div class="panel-header">
+            <h3>📻 RADIO TRANSCEIVER (CAPCOM)</h3>
+          </div>
+          <div class="chat-history" id="chat-history">
+            <div class="chat-msg system">
+              <span class="time">[00:00]</span> <strong>NASA CAPCOM:</strong> Channel open. Artemis LAN link established.
+            </div>
+          </div>
+          <form class="chat-input-bar" onsubmit="sendRadioMessage(event)">
+            <input type="text" id="chat-input" placeholder="Transmit instructions to Astronaut..." autocomplete="off">
+            <button type="submit" class="btn btn-send">SEND</button>
+          </form>
+
+          <!-- Quick directive buttons for Houston -->
+          <div class="houston-quick-talk">
+            <button type="button" class="quick-btn-houston" onclick="transmitDirectiveToAstronaut()">
+              📢 TRANSMIT ACTIVE REPAIR CODE
+            </button>
+          </div>
+
+          <div class="nasa-education-card">
+            <h4>🎓 NASA ASTRONAUT FACT</h4>
+            <p id="nasa-fact">In microgravity, astronauts exercise 2 hours daily on the T2 Treadmill and ARED resistance machine to prevent muscle and bone loss.</p>
+          </div>
+        </div>
+
+      </div>
+    </div>
+
+  </main>
+
+  <!-- ================= NOTIFICATION BANNER ================= -->
+  <div id="alert-banner" class="alert-banner hidden">
+    <div class="alert-content">
+      <span class="alert-icon">⚠️</span>
+      <span id="alert-text">EMERGENCY PROTOCOL ACTIVATED</span>
+    </div>
+  </div>
+
+  <script src="js/game.js"></script>
+</body>
+</html>
