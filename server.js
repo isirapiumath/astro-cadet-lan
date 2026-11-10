@@ -272,7 +272,7 @@ function startRoomLoop(roomId) {
 server.listen(PORT, '0.0.0.0', () => {
   const localIp = getLocalIp();
   console.log('\n======================================================');
-  console.log('🚀 NASA SPACE APPS: ASTROCADET LAN MISSION CONTROL 🚀');
+  console.log('🚀 ASTROCADET: LAN MISSION CONTROL & SPACEWALK 🚀');
   console.log('======================================================');
   console.log(`Local Access:   http://localhost:${PORT}`);
   console.log(`LAN WiFi URL:   http://${localIp}:${PORT}`);

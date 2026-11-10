@@ -1,7 +1,7 @@
 {
   "name": "astro-cadet-lan",
   "version": "1.0.0",
-  "description": "NASA Space Apps Hackathon - Junior Astronaut Trainer (LAN Co-op Spacewalk & Mission Control)",
+  "description": "AstroCadet - Junior Astronaut Trainer (LAN Co-op Spacewalk & Mission Control Simulator)",
   "main": "server.js",
   "type": "module",
   "scripts": {

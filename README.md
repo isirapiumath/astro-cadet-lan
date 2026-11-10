@@ -1,5 +1,5 @@
 # AstroCadet // Junior Astronaut Trainer (LAN Co-Op)
-### NASA Space Apps Challenge Submission Prototype
+### Cooperative Orbital Flight & Space Station Simulator
 
 **AstroCadet** is an interactive, asymmetric 2-player cooperative flight simulation where cadets train together as **Spacewalker (Astronaut EVA)** and **Flight Director (Houston CAPCOM)** to manage life-support, navigate microgravity inertia, and diagnose emergencies on the International Space Station (ISS).
 
